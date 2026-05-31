@@ -15,7 +15,7 @@ allowed for unbalanced panels.}
 
 \item{n_factors}{Positive integer. Number of interactive fixed effects \eqn{r}.}
 
-\item{n_out}{Positive integer. Number of outer GLS iterations (default 50).
+\item{n_out}{Positive integer. Number of outer iterations (default 50).
 Corresponds to \code{out_number} in the MATLAB replication code.}
 
 \item{n_in}{Positive integer. Number of inner PCA/EM iterations per outer
@@ -59,8 +59,8 @@ An object of class \code{"pvarife_result"}, which is a list with:
 \description{
 Jointly estimates VAR coefficients \eqn{\beta}, latent common factors
 \eqn{F}, and factor loadings \eqn{\Lambda} for a panel vector autoregression
-with interactive fixed effects, following the iterated GLS algorithm of
-Tugan (2021).
+with interactive fixed effects, following the iterative quasi-differencing
+algorithm of Tugan (2021).
 }
 \details{
 The model is
@@ -75,8 +75,8 @@ The algorithm alternates between:
   \item An \strong{inner loop} that extracts factors and loadings via PCA
     (principal components on the residual cross-product matrix) and imputes
     missing observations (EM step of Bai 2009).
-  \item An \strong{outer loop} that updates \eqn{\beta} via GLS after
-    projecting out the estimated factors.
+  \item An \strong{outer loop} that updates \eqn{\beta} via least squares
+    after projecting out the estimated factors (quasi-differencing step).
 }
 }
 \examples{
