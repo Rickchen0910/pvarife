@@ -5,8 +5,9 @@ Title: Panel VAR Models with Interactive Fixed Effects
 Description: Implements the estimator of Tugan (2021) <doi:10.1093/ectj/utaa021>
     for panel vector autoregression (VAR) models with interactive fixed effects.
     Provides joint estimation of VAR coefficients, latent common factors, and
-    factor loadings via an iterative quasi-differencing algorithm (inner PCA
-    factor extraction alternating with outer least squares updating). Supports
+    factor loadings via an iterative algorithm that alternates between principal
+    component estimation of the factors and least squares estimation of the VAR
+    coefficients, following the approach of Bai (2009). Supports
     impulse response functions under recursive (Cholesky) identification,
     parametric confidence bands from the joint asymptotic distribution of the
     estimator (Theorem 2.3), and a classical residual bootstrap for robustness
