@@ -2,7 +2,7 @@
 
 **Panel VAR Models with Interactive Fixed Effects**
 
-An R implementation of the estimator proposed by Tuğan (2021, *Econometrics Journal*) for panel vector autoregression (VAR) models with interactive fixed effects. The package jointly estimates VAR coefficients, latent common factors, and unit-specific factor loadings via iterated GLS, following an inner/outer EM algorithm. Asymptotic inference is based on Theorem 2.3 of the paper.
+An R implementation of the estimator proposed by Tuğan (2021, *Econometrics Journal*) for panel vector autoregression (VAR) models with interactive fixed effects. The package jointly estimates VAR coefficients, latent common factors, and unit-specific factor loadings via an iterative quasi-differencing algorithm: inner PCA factor extraction alternates with outer least squares updating of the VAR coefficients. Asymptotic inference is based on Theorem 2.3 of the paper.
 
 ---
 
