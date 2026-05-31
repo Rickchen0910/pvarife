@@ -1,0 +1,342 @@
+---
+title: "Getting Started with pvarife"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with pvarife}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 7,
+  fig.height = 4
+)
+```
+
+## Introduction
+
+**pvarife** implements the Panel VAR estimator with Interactive Fixed Effects
+(IFE) of Tuğan (2021).  The model is
+
+$$
+y_{i,t} = \sum_{\ell=1}^{L} \Theta_\ell \, y_{i,t-\ell}
+          + F_t \lambda_i + e_{i,t},
+\quad i = 1,\ldots,I,\; t = 1,\ldots,T,
+$$
+
+where $y_{i,t}$ is a $K\times 1$ vector of endogenous variables, $F_t$ is an
+$r\times 1$ vector of **unobservable** common factors, $\lambda_i$ is a
+unit-specific loading vector, and $e_{i,t}$ is an idiosyncratic error.
+
+The estimator jointly identifies $\beta = [\Theta_1,\ldots,\Theta_L]$,
+$F = \{F_t\}$, and $\Lambda = \{\lambda_i\}$ via an inner/outer EM
+algorithm (Bai 2009). Impulse responses under recursive (Cholesky)
+identification and asymptotic confidence bands (Theorem 2.3 of Tuğan 2021)
+are provided.
+
+> **Reference:**
+> Tuğan, M. (2021). Panel VAR models with interactive fixed effects.
+> *Econometrics Journal*, 24, 225–246.
+> <https://doi.org/10.1093/ectj/utaa021>
+
+---
+
+## 1  Data Format
+
+The main input is a three-dimensional array `y[i, t, k]`:
+
+| Dimension | Index | Meaning |
+|-----------|-------|---------|
+| 1 | `i` | cross-sectional unit |
+| 2 | `t` | time period |
+| 3 | `k` | VAR variable |
+
+`NA` values are allowed for **unbalanced panels**; the algorithm imputes
+missing entries via the EM step.
+
+---
+
+## 2  Simulate Data
+
+```{r simulate}
+library(pvarife)
+
+set.seed(1)
+sim <- sim_pvarife(
+  n_units   = 50,   # I
+  n_time    = 30,   # T
+  n_vars    = 2,    # K
+  n_lags    = 1,    # lag order
+  n_factors = 1,    # number of interactive fixed effects
+  seed      = 42
+)
+
+dim(sim$y)          # I x T x K
+sim$beta_true       # true coefficient vector
+sim$sigma_true      # true reduced-form covariance
+```
+
+The function generates data from the DGP of Tuğan (2021), Section S10:
+
+- VAR coefficient matrix $\Theta_1 = \begin{pmatrix}0.65 & 0.30\\0.20 & 0.60\end{pmatrix}$
+- Reduced-form covariance $\Sigma_e = \begin{pmatrix}1 & 0.5\\0.5 & 1\end{pmatrix}$
+- Common factor: AR(1) with coefficient 0.5
+- Loadings $\lambda_{k,i} \sim N(1, 1)$ independently
+
+---
+
+## 3  Estimate the Model
+
+```{r estimate}
+fit <- pvarife(
+  y         = sim$y,
+  n_lags    = 1,
+  n_factors = 1,
+  n_out     = 20,   # outer GLS iterations (paper default: 50)
+  n_in      = 5    # inner PCA/EM iterations (paper default: 10)
+)
+
+print(fit)
+```
+
+The `n_out` and `n_in` parameters control the convergence of the EM algorithm.
+For publication-quality results use the defaults (`n_out = 50`, `n_in = 10`);
+smaller values speed up experimentation.
+
+### Extract coefficients
+
+```{r coef}
+coef(fit)
+```
+
+The first $K$ elements are equation-specific intercepts; the remaining
+$K^2 L$ elements are the VAR lag matrices $\Theta_1, \ldots, \Theta_L$
+(stacked row-major).
+
+---
+
+## 4  Impulse Response Functions
+
+### Point estimates (no confidence bands)
+
+```{r irf-point}
+ir <- compute_irf(
+  fit,
+  n_periods = 8,
+  shock     = 1L     # shock to first variable (Cholesky ordering)
+)
+
+dim(ir)    # K x n_periods
+
+plot(ir, var_names = c("Variable 1", "Variable 2"))
+```
+
+### Confidence bands (asymptotic simulation)
+
+The `irf_bands()` function draws from the joint asymptotic distribution of
+$\hat\beta$ and the common component (Theorem 2.3 of Tuğan 2021).
+
+```{r irf-bands, eval=FALSE}
+bands <- irf_bands(
+  fit,
+  n_periods = 8,
+  n_draw    = 200,    # paper default: 500
+  level     = 0.95,
+  seed      = 1
+)
+
+plot(bands, var_names = c("Variable 1", "Variable 2"))
+```
+
+### Classical residual bootstrap (optional)
+
+For robustness checks that do not rely on asymptotic approximations:
+
+```{r bootstrap, eval=FALSE}
+bsb <- bootstrap_irf_bands(
+  fit,
+  n_periods = 8,
+  n_boot    = 100,   # computationally expensive
+  level     = 0.95,
+  seed      = 2
+)
+plot(bsb, var_names = c("Variable 1", "Variable 2"))
+```
+
+---
+
+## 5  Long-Run Identification (Blanchard-Quah)
+
+By default `compute_irf()` uses **short-run (Cholesky) identification**: the
+impact matrix $A_0 = \mathrm{chol}(\hat\Sigma)^\top$ is lower-triangular, so
+shock 1 has no *contemporaneous* effect on variable 2.
+
+For **long-run identification**, the *cumulative* impact matrix
+$C(1) = (I - \Theta_1)^{-1} A_0$ is constrained to be lower-triangular:
+shock 1 has no *long-run* (permanent) effect on variable 2. The impact matrix
+becomes
+
+$$A_0 = (I - \Theta_1)\,\mathrm{chol}(D)^\top, \quad
+D = (I-\Theta_1)^{-1}\hat\Sigma(I-\Theta_1)^{-\top}.$$
+
+This matches the MATLAB Monte Carlo code
+`IRs_to_Shocks_LR_Identification.m`.
+
+### Long-run DGP
+
+```{r lr-sim, eval=FALSE}
+sim_lr <- sim_pvarife(
+  n_units        = 50,
+  n_time         = 30,
+  identification = "long_run",   # Blanchard-Quah DGP
+  seed           = 42
+)
+sim_lr$identification          # "long_run"
+sim_lr$diff_vars_suggested     # 1L  (display cumulative IRF for variable 1)
+```
+
+### Long-run IRFs and bands
+
+```{r lr-irf, eval=FALSE}
+fit_lr <- pvarife(sim_lr$y, n_lags = 1, n_factors = 1, n_out = 20, n_in = 5)
+
+# Point estimate at estimated beta (uncorrected)
+ir_lr <- compute_irf(
+  fit_lr,
+  n_periods      = 8,
+  identification = "long_run",
+  diff_vars      = sim_lr$diff_vars_suggested   # cumulate variable 1
+)
+plot(ir_lr, var_names = c("Variable 1", "Variable 2"))
+
+# Bias-corrected point estimate
+ir_lr_bc <- compute_irf(
+  fit_lr,
+  n_periods      = 8,
+  identification = "long_run",
+  diff_vars      = 1L,
+  bias_correct   = TRUE    # apply Theorem 2.3 bias correction
+)
+
+# Full confidence bands (median is already bias-corrected)
+bands_lr <- irf_bands(
+  fit_lr,
+  n_periods      = 8,
+  identification = "long_run",
+  diff_vars      = 1L,
+  n_draw         = 200,
+  seed           = 1
+)
+plot(bands_lr, var_names = c("Variable 1", "Variable 2"))
+```
+
+---
+
+## 6  Bias-Corrected Point Estimate
+
+The `pvarife()` estimator has a bias of order $O(1/\sqrt{TC})$ documented in
+Theorem 2.3 of Tuğan (2021). Setting `bias_correct = TRUE` in `compute_irf()`
+subtracts the analytical bias from $\hat\beta$ before computing the MA
+representation.
+
+| Call | Description |
+|------|-------------|
+| `compute_irf(fit)` | Fast uncorrected point estimate |
+| `compute_irf(fit, bias_correct = TRUE)` | Bias-corrected point estimate |
+| `irf_bands(fit)` | Full inference; **median is implicitly bias-corrected** |
+
+```{r bias-correct, eval=FALSE}
+ir_unc <- compute_irf(fit, n_periods = 8)
+ir_bc  <- compute_irf(fit, n_periods = 8, bias_correct = TRUE)
+# ir_bc is close to the median returned by irf_bands()
+```
+
+---
+
+## 7  Asymptotic Inference
+
+```{r avar, eval=FALSE}
+avar <- asymptotic_var(fit)
+se   <- sqrt(diag(avar$variance))
+
+# Bias-corrected 95% confidence intervals for each element of beta
+beta_hat   <- as.numeric(fit$beta)
+beta_biasC <- beta_hat - avar$bias
+ci_lower   <- beta_biasC - 1.96 * se
+ci_upper   <- beta_biasC + 1.96 * se
+
+data.frame(
+  parameter = names(coef(fit)),
+  estimate  = round(beta_hat, 4),
+  std_err   = round(se, 4),
+  ci_lower  = round(ci_lower, 4),
+  ci_upper  = round(ci_upper, 4)
+)
+```
+
+---
+
+## 8  Working with Unbalanced Panels
+
+Simply set missing cells to `NA` before calling `pvarife()`:
+
+```{r unbalanced, eval=FALSE}
+y_unbal <- sim$y
+# Randomly set 15% of unit-time observations to NA
+set.seed(10)
+mask <- array(runif(prod(dim(y_unbal))) < 0.15, dim = dim(y_unbal))
+y_unbal[mask] <- NA
+
+fit_unbal <- pvarife(y_unbal, n_lags = 1, n_factors = 1, n_out = 10, n_in = 5)
+print(fit_unbal)
+```
+
+The EM step in the inner loop imputes missing observations using the current
+factor estimates, consistent with the approach of Bai (2009).
+
+---
+
+## 9  Tuning Advice
+
+| Parameter | Recommended | Notes |
+|-----------|-------------|-------|
+| `n_out` | 50 | Increase if coefficients have not converged |
+| `n_in` | 10 | Increase for more precise factor extraction |
+| `n_factors` | Use IC criteria | See paper Section 3 for selection |
+| `n_draw` | 500 | For `irf_bands()`; reduce for testing |
+| `n_boot` | 200 | For `bootstrap_irf_bands()`; very slow |
+
+To check convergence, compare results with `n_out = 50` and `n_out = 100`.
+
+---
+
+## 10  Replicating the Liaqat (2019) Application
+
+The paper's empirical application uses panel data on government debt and capital
+formation from Liaqat (2019). The dataset is not bundled with this package due
+to redistribution restrictions, but the replication code is available in the
+MATLAB package at `documentforrepl/replication package/Economic Application/`.
+
+The R workflow would be:
+
+1. Load the Liaqat dataset and compute first-differenced variables
+2. Set `n_lags = 1`, `n_factors = 2` (for Panel B of Figure 1, `rmax = 2`)
+3. Call `pvarife()`, `compute_irf()`, and `irf_bands()` with `n_draw = 500`
+4. Normalize IRFs by dividing by `ir[1, 1]` (shock to first variable at horizon 1)
+
+---
+
+## References
+
+- Tuğan, M. (2021). Panel VAR models with interactive fixed effects.
+  *Econometrics Journal*, **24**, 225–246.
+  <https://doi.org/10.1093/ectj/utaa021>
+
+- Bai, J. (2009). Panel data models with interactive fixed effects.
+  *Econometrica*, **77**(4), 1229–1279.
+
+- Liaqat, Z. (2019). Does public debt cause crowding out? A cross-country
+  empirical evidence. *Economics Letters*, **181**, 1–4.
