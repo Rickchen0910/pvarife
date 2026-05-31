@@ -2,8 +2,8 @@
 #'
 #' Jointly estimates VAR coefficients \eqn{\beta}, latent common factors
 #' \eqn{F}, and factor loadings \eqn{\Lambda} for a panel vector autoregression
-#' with interactive fixed effects, following the iterated GLS algorithm of
-#' Tugan (2021).
+#' with interactive fixed effects, following the iterative quasi-differencing
+#' algorithm of Tugan (2021).
 #'
 #' @details
 #' The model is
@@ -18,8 +18,8 @@
 #'   \item An \strong{inner loop} that extracts factors and loadings via PCA
 #'     (principal components on the residual cross-product matrix) and imputes
 #'     missing observations (EM step of Bai 2009).
-#'   \item An \strong{outer loop} that updates \eqn{\beta} via GLS after
-#'     projecting out the estimated factors.
+#'   \item An \strong{outer loop} that updates \eqn{\beta} via least squares
+#'     after projecting out the estimated factors (quasi-differencing step).
 #' }
 #'
 #' @param y A numeric array of dimension \eqn{I \times T \times K}
@@ -27,7 +27,7 @@
 #'   allowed for unbalanced panels.
 #' @param n_lags Positive integer. Lag order \eqn{\ell}.
 #' @param n_factors Positive integer. Number of interactive fixed effects \eqn{r}.
-#' @param n_out Positive integer. Number of outer GLS iterations (default 50).
+#' @param n_out Positive integer. Number of outer iterations (default 50).
 #'   Corresponds to \code{out_number} in the MATLAB replication code.
 #' @param n_in Positive integer. Number of inner PCA/EM iterations per outer
 #'   step (default 10). Corresponds to \code{in_number} in the MATLAB code.
@@ -216,7 +216,7 @@ pvarife <- function(y, n_lags, n_factors, n_out = 50L, n_in = 10L,
     }  # end inner loop
 
     # -----------------------------------------------------------------------
-    # Outer update: GLS with M_F projection
+    # Outer update: least squares after M_F projection (quasi-differencing)
     # -----------------------------------------------------------------------
     m_f <- diag(n_rows) - factors_mat %*% solve(crossprod(factors_mat), t(factors_mat))
 
