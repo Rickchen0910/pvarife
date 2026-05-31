@@ -2,8 +2,8 @@
 #'
 #' Jointly estimates VAR coefficients \eqn{\beta}, latent common factors
 #' \eqn{F}, and factor loadings \eqn{\Lambda} for a panel vector autoregression
-#' with interactive fixed effects, following the iterative quasi-differencing
-#' algorithm of Tugan (2021).
+#' with interactive fixed effects, following the iterative algorithm of
+#' Tugan (2021) based on Bai (2009).
 #'
 #' @details
 #' The model is
@@ -19,7 +19,7 @@
 #'     (principal components on the residual cross-product matrix) and imputes
 #'     missing observations (EM step of Bai 2009).
 #'   \item An \strong{outer loop} that updates \eqn{\beta} via least squares
-#'     after projecting out the estimated factors (quasi-differencing step).
+#'     after projecting out the estimated factors (using \eqn{M_F = I - F(F'F)^{-1}F'}).
 #' }
 #'
 #' @param y A numeric array of dimension \eqn{I \times T \times K}
