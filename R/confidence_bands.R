@@ -96,29 +96,27 @@ irf_bands <- function(fit, n_periods, shock = 1L, diff_vars = integer(0),
   }
 
   # --- XiStar: (1/I) * uncertainty from loading estimation ---
-  # XiStar[row, i] = (I_K o lambda_i' (1/I * lambda lambda')^{-1} lambda_i) diag(Sigma)[k]
-  # Simplified per-observation scalar:
-  lambda_mat <- matrix(NA_real_, nrow = n_vars, ncol = n_units)
-  # Reshape loadings: each column is Kr-vector; reshape to K x r x n_units
-  for (ii in seq_len(n_units)) {
-    lam_i <- matrix(loadings[, ii], nrow = n_vars, ncol = n_factors)
-    lambda_mat[, ii] <- rowSums(lam_i)  # simplified scalar loading per variable
-  }
-  lambda_full <- do.call(rbind, lapply(seq_len(n_units), function(ii) {
-    matrix(loadings[, ii], nrow = n_vars, ncol = n_factors)
-  }))  # (K*I) x r
-  lam_lam_inv <- solve(crossprod(lambda_full) / (n_vars * n_units))
+  # Faithful to ConfidenceBandforIRs.m (Tugan 2021):
+  #   XiStar[N(t-1)+n, c] = ( lambda_c' ((1/I) lambda lambda')^{-1} lambda_c )
+  #                         * Sigma_e[n, n]
+  # where `loadings` is the (Kr x I) raw loading matrix and lambda_c its c-th
+  # column. The quadratic form is a single scalar per unit (mixing all Kr
+  # loadings); it is constant across time t and is scaled by the n-th diagonal
+  # element of Sigma for variable n.
+  m_lam     <- (loadings %*% t(loadings)) / n_units   # (Kr) x (Kr)
+  m_lam_inv <- solve(m_lam)
+  q_unit <- vapply(
+    seq_len(n_units),
+    function(ii) as.numeric(crossprod(loadings[, ii], m_lam_inv %*% loadings[, ii])),
+    numeric(1L)
+  )                                                    # length I
+  sig_diag <- diag(sigma)                              # length K
 
   xi_star <- matrix(NA_real_, nrow = n_rows, ncol = n_units)
   for (tt in seq_len(n_time)) {
     for (kk in seq_len(n_vars)) {
       row_idx <- (tt - 1L) * n_vars + kk
-      for (ii in seq_len(n_units)) {
-        lam_i <- matrix(loadings[, ii], nrow = n_vars, ncol = n_factors)
-        lam_row <- lam_i[kk, , drop = FALSE]  # 1 x r
-        xi_star[row_idx, ii] <-
-          as.numeric(lam_row %*% lam_lam_inv %*% t(lam_row)) * sigma[kk, kk]
-      }
+      xi_star[row_idx, ] <- q_unit * sig_diag[kk]
     }
   }
 
