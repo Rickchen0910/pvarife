@@ -69,13 +69,11 @@ The median and the \eqn{(1-\mathrm{level})/2} and
 and confidence bands.
 }
 \examples{
-\dontrun{
-sim   <- sim_pvarife(n_units = 30, n_time = 20, n_vars = 2,
+sim   <- sim_pvarife(n_units = 20, n_time = 15, n_vars = 2,
                      n_lags = 1, n_factors = 1, seed = 1)
-fit   <- pvarife(sim$y, n_lags = 1, n_factors = 1, n_out = 10, n_in = 5)
-bands <- irf_bands(fit, n_periods = 8, n_draw = 200, seed = 42)
+fit   <- pvarife(sim$y, n_lags = 1, n_factors = 1, n_out = 5, n_in = 3)
+bands <- irf_bands(fit, n_periods = 6, n_draw = 100, seed = 42)
 plot(bands)
-}
 
 }
 \references{
