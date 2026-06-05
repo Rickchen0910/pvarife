@@ -49,13 +49,11 @@
 #' \doi{10.1093/ectj/utaa021}
 #'
 #' @examples
-#' \dontrun{
-#' sim   <- sim_pvarife(n_units = 30, n_time = 20, n_vars = 2,
+#' sim   <- sim_pvarife(n_units = 20, n_time = 15, n_vars = 2,
 #'                      n_lags = 1, n_factors = 1, seed = 1)
-#' fit   <- pvarife(sim$y, n_lags = 1, n_factors = 1, n_out = 10, n_in = 5)
-#' bands <- irf_bands(fit, n_periods = 8, n_draw = 200, seed = 42)
+#' fit   <- pvarife(sim$y, n_lags = 1, n_factors = 1, n_out = 5, n_in = 3)
+#' bands <- irf_bands(fit, n_periods = 6, n_draw = 100, seed = 42)
 #' plot(bands)
-#' }
 #'
 #' @seealso \code{\link{bootstrap_irf_bands}}, \code{\link{compute_irf}}
 #'
@@ -221,11 +219,11 @@ irf_bands <- function(fit, n_periods, shock = 1L, diff_vars = integer(0),
 #'   \code{method = "bootstrap"}.
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' sim   <- sim_pvarife(n_units = 20, n_time = 15, n_vars = 2,
 #'                      n_lags = 1, n_factors = 1, seed = 1)
 #' fit   <- pvarife(sim$y, n_lags = 1, n_factors = 1, n_out = 5, n_in = 3)
-#' bands <- bootstrap_irf_bands(fit, n_periods = 6, n_boot = 50, seed = 42)
+#' bands <- bootstrap_irf_bands(fit, n_periods = 6, n_boot = 20, seed = 42)
 #' plot(bands)
 #' }
 #'
