@@ -48,11 +48,11 @@ computed. This is computationally expensive but does not rely on asymptotic
 approximations.
 }
 \examples{
-\dontrun{
+\donttest{
 sim   <- sim_pvarife(n_units = 20, n_time = 15, n_vars = 2,
                      n_lags = 1, n_factors = 1, seed = 1)
 fit   <- pvarife(sim$y, n_lags = 1, n_factors = 1, n_out = 5, n_in = 3)
-bands <- bootstrap_irf_bands(fit, n_periods = 6, n_boot = 50, seed = 42)
+bands <- bootstrap_irf_bands(fit, n_periods = 6, n_boot = 20, seed = 42)
 plot(bands)
 }
 
