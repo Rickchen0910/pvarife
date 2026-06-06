@@ -172,9 +172,6 @@ irf_bands <- function(fit, n_periods, shock = 1L, diff_vars = integer(0),
   alpha_lo <- (1.0 - level) / 2.0
   alpha_hi <- 1.0 - alpha_lo
 
-  ir_sorted  <- apply(irf_draws, c(1L, 2L), function(x) sort(x[!is.na(x)]))
-  n_valid    <- apply(irf_draws, c(1L, 2L), function(x) sum(!is.na(x)))
-
   irf_med   <- apply(irf_draws, c(1L, 2L), stats::median, na.rm = TRUE)
   irf_lower <- apply(irf_draws, c(1L, 2L), stats::quantile,
                      probs = alpha_lo, na.rm = TRUE)
@@ -194,14 +191,30 @@ irf_bands <- function(fit, n_periods, shock = 1L, diff_vars = integer(0),
 }
 
 
-#' Classical residual bootstrap confidence bands for IRFs
+#' Recursive residual bootstrap confidence bands for IRFs
 #'
-#' Constructs confidence bands for structural impulse responses via a classical
-#' residual bootstrap. For each bootstrap replicate, residuals are resampled
-#' (by time index, preserving cross-sectional dependence), a new panel is
-#' constructed, the full \code{pvarife} model is re-estimated, and IRFs are
-#' computed. This is computationally expensive but does not rely on asymptotic
-#' approximations.
+#' Constructs confidence bands for structural impulse responses via a recursive
+#' residual bootstrap. For each bootstrap replicate, the idiosyncratic residuals
+#' are resampled (by time index, preserving the contemporaneous correlation
+#' across variables), a new panel is generated \emph{recursively} from the
+#' estimated VAR dynamics and the (fixed) estimated common component, the full
+#' \code{pvarife} model is re-estimated, and IRFs are computed. This is
+#' computationally expensive but does not rely on asymptotic approximations.
+#'
+#' @details
+#' Each bootstrap panel is generated as
+#' \deqn{y^*_{i,t} = c + \sum_{l=1}^{\ell} \Theta_l y^*_{i,t-l}
+#'       + \hat F_t \hat\lambda_i + e^*_{i,t},}
+#' where \eqn{(c, \Theta_l)} are the estimated coefficients, the common
+#' component \eqn{\hat F_t \hat\lambda_i} is held fixed at its estimate, the
+#' first \eqn{\ell} periods are initialised at the observed data
+#' \eqn{y^*_{i,t} = y_{i,t}}, and \eqn{e^*_{i,t}} are residuals resampled with
+#' replacement (whole time rows, so the cross-variable correlation is kept).
+#' Because the path is generated recursively, the bootstrap correctly
+#' propagates the VAR dynamics — unlike a fixed-design scheme that reuses the
+#' original lags. The factor-estimation uncertainty is not resampled (the
+#' common component is held fixed); use \code{\link{irf_bands}} for bands that
+#' also reflect factor uncertainty.
 #'
 #' @param fit An object of class \code{"pvarife_result"}.
 #' @param n_periods Positive integer. Number of IRF horizons.
@@ -253,58 +266,70 @@ bootstrap_irf_bands <- function(fit, n_periods, shock = 1L,
   i_obs       <- fit$i_obs
   factors_mat <- fit$factors_mat
   loadings    <- fit$loadings
-  beta        <- fit$beta
+  beta        <- as.numeric(fit$beta)
   n_time_i    <- fit$n_time_i
-  n_rows      <- nrow(y_c)
+  y_arr       <- fit$y_arr   # original I x T x K input
 
-  # Compute residuals (T_i x K per unit)
-  u_list <- vector("list", n_units)
+  if (is.null(y_arr))
+    stop("fit$y_arr is missing; re-estimate with pvarife() (>= 0.1.1).")
+
+  # --- VAR coefficient matrices Theta_1, ..., Theta_l and intercept c ---
+  c_vec <- beta[seq_len(n_vars)]
+  alpha <- t(matrix(beta[(n_vars + 1L):length(beta)],
+                    nrow = n_vars * n_lags, ncol = n_vars))   # K x (K*L)
+  theta_l <- array(0.0, dim = c(n_vars, n_vars, n_lags))
+  for (ll in seq_len(n_lags)) {
+    theta_l[, , ll] <- alpha[, ((ll - 1L) * n_vars + 1L):(ll * n_vars), drop = FALSE]
+  }
+
+  # --- Estimated common component C_i (T x K per unit) and residuals e_i ---
+  # C_i stacked = factors_mat %*% loadings[, i]  (TK x 1), reshaped to T x K.
+  # Residuals are taken on observed rows only (T_i x K).
+  cc_list <- vector("list", n_units)   # T x K (all periods)
+  u_list  <- vector("list", n_units)   # T_i x K (observed periods)
   for (ii in seq_len(n_units)) {
+    cc_vec <- as.numeric(factors_mat %*% loadings[, ii])      # TK x 1
+    cc_list[[ii]] <- t(matrix(cc_vec, nrow = n_vars, ncol = n_time))  # T x K
+
     obs <- which(i_obs[, ii] == 1L)
     if (length(obs) == 0L) { u_list[[ii]] <- NULL; next }
-    yy   <- matrix(y_c[obs, 1L, ii], ncol = 1L)
-    zz   <- matrix(z_c[obs, , ii], nrow = length(obs))
-    ci   <- matrix(factors_mat[obs, ] %*% loadings[, ii], ncol = 1L)
-    uu   <- yy - zz %*% beta - ci
-    tt_i <- n_time_i[ii]
-    u_list[[ii]] <- matrix(uu, nrow = n_vars, ncol = tt_i)  # K x T_i
-    u_list[[ii]] <- t(u_list[[ii]])                          # T_i x K
+    yy <- y_c[obs, 1L, ii]
+    zz <- matrix(z_c[obs, , ii], nrow = length(obs))
+    uu <- yy - as.numeric(zz %*% beta) - cc_vec[obs]
+    u_list[[ii]] <- t(matrix(uu, nrow = n_vars, ncol = n_time_i[ii]))  # T_i x K
   }
 
   irf_draws <- array(NA_real_, dim = c(n_vars, n_periods, n_boot))
 
   for (bb in seq_len(n_boot)) {
-    # Build bootstrapped y_arr: I x T x K
-    y_boot <- fit$y_c * NA_real_  # initialise as NA, same structure as y_c
+    # Generate a bootstrap panel recursively: I x T x K
     y_arr_boot <- array(NA_real_, dim = c(n_units, n_time, n_vars))
 
     for (ii in seq_len(n_units)) {
-      obs <- which(i_obs[, ii] == 1L)
-      if (length(obs) == 0L || is.null(u_list[[ii]])) next
-
+      if (is.null(u_list[[ii]])) next
       tt_i   <- n_time_i[ii]
-      resamp <- sample.int(tt_i, tt_i, replace = TRUE)
-      u_boot <- u_list[[ii]][resamp, , drop = FALSE]  # T_i x K (resampled)
+      cc_i   <- cc_list[[ii]]                                   # T x K
+      e_pool <- u_list[[ii]]                                    # T_i x K
 
-      # Reconstruct y = Z*beta + F*lambda + u_boot (observed positions)
-      zz   <- matrix(z_c[obs, , ii], nrow = length(obs))
-      ci   <- matrix(factors_mat[obs, ] %*% loadings[, ii], ncol = 1L)
-      yy_b <- zz %*% beta + ci +
-        matrix(t(u_boot), ncol = 1L)  # NT_i x 1
+      # Initialise the first n_lags periods at the observed data
+      for (tt in seq_len(n_lags)) y_arr_boot[ii, tt, ] <- y_arr[ii, tt, ]
 
-      y_arr_boot_ii <- array(NA_real_, dim = c(n_time, n_vars))
-      # Map back: obs rows -> time indices
-      obs_t_idx <- ceiling(obs / n_vars)
-      for (jj in seq_along(obs_t_idx)) {
-        tt_idx <- obs_t_idx[jj]
-        kk_idx <- obs[jj] - (tt_idx - 1L) * n_vars
-        y_arr_boot[ii, tt_idx, kk_idx] <- yy_b[jj]
+      # Resample residual time-rows for periods (n_lags+1) .. n_time
+      n_gen  <- n_time - n_lags
+      resamp <- sample.int(tt_i, n_gen, replace = TRUE)
+
+      for (tt in seq(n_lags + 1L, n_time)) {
+        y_t <- c_vec + cc_i[tt, ] + e_pool[resamp[tt - n_lags], ]
+        for (ll in seq_len(n_lags)) {
+          y_t <- y_t + theta_l[, , ll] %*% y_arr_boot[ii, tt - ll, ]
+        }
+        y_arr_boot[ii, tt, ] <- as.numeric(y_t)
       }
     }
 
     fit_b <- tryCatch(
       pvarife(y_arr_boot, n_lags = n_lags, n_factors = n_factors,
-              n_out = n_out, n_in = n_in),
+              n_out = n_out, n_in = n_in, balanced_init = FALSE),
       error = function(e) NULL
     )
     if (is.null(fit_b)) next
