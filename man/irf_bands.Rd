@@ -67,6 +67,21 @@ For each of the \code{n_draw} repetitions, the function:
 The median and the \eqn{(1-\mathrm{level})/2} and
 \eqn{(1+\mathrm{level})/2} quantiles across draws give the point estimate
 and confidence bands.
+
+\strong{Scope of the bands.} This is a faithful implementation of the band
+construction in Tugan (2021) (\code{ConfidenceBandforIRs.m}): the bands
+propagate uncertainty in the VAR coefficients \eqn{\beta} and in the
+estimated common component, but the reduced-form covariance \eqn{\hat\Sigma}
+is recomputed deterministically for each draw and therefore contributes
+little draw-to-draw variation. As a result the bands mainly reflect
+\emph{coefficient} (dynamic) uncertainty and \emph{under-state} uncertainty
+in the contemporaneous impact at horizon 0 (which is a function of
+\eqn{\Sigma} alone). Impulse responses are conventionally reported
+normalised by the shock's own horizon-0 response (see \code{plot} and the
+\code{normalise_by_h1} argument), which fixes that element to one. For formal
+inference on the coefficients themselves use \code{\link{asymptotic_var}} or
+\code{\link{summary.pvarife_result}}, whose Wald intervals attain nominal
+coverage in simulations.
 }
 \examples{
 sim   <- sim_pvarife(n_units = 20, n_time = 15, n_vars = 2,
