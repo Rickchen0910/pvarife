@@ -21,6 +21,21 @@
 #' \eqn{(1+\mathrm{level})/2} quantiles across draws give the point estimate
 #' and confidence bands.
 #'
+#' \strong{Scope of the bands.} This is a faithful implementation of the band
+#' construction in Tugan (2021) (\code{ConfidenceBandforIRs.m}): the bands
+#' propagate uncertainty in the VAR coefficients \eqn{\beta} and in the
+#' estimated common component, but the reduced-form covariance \eqn{\hat\Sigma}
+#' is recomputed deterministically for each draw and therefore contributes
+#' little draw-to-draw variation. As a result the bands mainly reflect
+#' \emph{coefficient} (dynamic) uncertainty and \emph{under-state} uncertainty
+#' in the contemporaneous impact at horizon 0 (which is a function of
+#' \eqn{\Sigma} alone). Impulse responses are conventionally reported
+#' normalised by the shock's own horizon-0 response (see \code{plot} and the
+#' \code{normalise_by_h1} argument), which fixes that element to one. For formal
+#' inference on the coefficients themselves use \code{\link{asymptotic_var}} or
+#' \code{\link{summary.pvarife_result}}, whose Wald intervals attain nominal
+#' coverage in simulations.
+#'
 #' @param fit An object of class \code{"pvarife_result"}.
 #' @param n_periods Positive integer. Number of IRF horizons.
 #' @param shock Positive integer. Index of the structural shock (default 1).
@@ -212,9 +227,17 @@ irf_bands <- function(fit, n_periods, shock = 1L, diff_vars = integer(0),
 #' replacement (whole time rows, so the cross-variable correlation is kept).
 #' Because the path is generated recursively, the bootstrap correctly
 #' propagates the VAR dynamics — unlike a fixed-design scheme that reuses the
-#' original lags. The factor-estimation uncertainty is not resampled (the
-#' common component is held fixed); use \code{\link{irf_bands}} for bands that
-#' also reflect factor uncertainty.
+#' original lags.
+#'
+#' \strong{Scope of the bands.} Only the idiosyncratic errors are resampled;
+#' the common component \eqn{\hat F_t \hat\lambda_i} and the reduced-form
+#' covariance structure are held at their estimates. The resulting bands
+#' therefore capture idiosyncratic-error uncertainty only and \emph{under-cover}
+#' when the common factors account for a large share of the variation (as they
+#' do in the simulation design of Tugan 2021). This routine is intended as a
+#' robustness check; for coefficient inference use \code{\link{asymptotic_var}}
+#' or \code{\link{summary.pvarife_result}}, and for the paper's IRF bands use
+#' \code{\link{irf_bands}}.
 #'
 #' @param fit An object of class \code{"pvarife_result"}.
 #' @param n_periods Positive integer. Number of IRF horizons.
