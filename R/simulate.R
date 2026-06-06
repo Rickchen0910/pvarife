@@ -164,13 +164,17 @@ sim_pvarife <- function(n_units = 50L, n_time = 30L, n_vars = 2L,
   # True loadings summary: K x I (sum over factors for display)
   lam_summary <- apply(lam_true, c(1L, 2L), sum)  # K x I
 
-  # Build beta_true in the same format as fit$beta
-  # beta = [c_vec; vec(Theta_1')]  (intercepts first, then lag coefficients)
-  theta_vec <- as.numeric(t(theta_arr[, , 1L]))  # K^2 values (row-major of Theta_1)
-  # seq(2, n_lags) is dangerous when n_lags=1 (returns c(2,1) not integer(0))
-  if (n_lags >= 2L) {
-    for (ll in seq(2L, n_lags)) {
-      theta_vec <- c(theta_vec, as.numeric(t(theta_arr[, , ll])))
+  # Build beta_true in the SAME layout as fit$beta (see .build_yz):
+  # intercepts first, then for each equation k, the lag coefficients nested as
+  # (lag 1 vars 1..K, lag 2 vars 1..K, ...). i.e. equation-major, lag-nested.
+  #   beta[K + (k-1)*K*L + (l-1)*K + j] = Theta_l[k, j]
+  # For n_lags = 1 this reduces to the row-major vec of Theta_1.
+  theta_vec <- numeric(0L)
+  for (kk in seq_len(n_vars)) {        # equation
+    for (ll in seq_len(n_lags)) {      # lag
+      for (jj in seq_len(n_vars)) {    # regressor variable
+        theta_vec <- c(theta_vec, theta_arr[kk, jj, ll])
+      }
     }
   }
   beta_true <- c(c_vec, theta_vec)
