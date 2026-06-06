@@ -44,6 +44,8 @@ An object of class \code{"pvarife_result"}, which is a list with:
     \item{sigma}{Reduced-form error covariance matrix (\eqn{K \times K}).}
     \item{u_c}{Array of residuals \eqn{TK \times 1 \times I} (NA at
       unobserved positions).}
+    \item{y_arr}{The original input array \eqn{I \times T \times K} (used,
+      e.g., for initial conditions in \code{\link{bootstrap_irf_bands}}).}
     \item{y_c, z_c}{Stacked outcome/regressor arrays (\eqn{TK \times 1 \times I}
       and \eqn{TK \times (K + K^2\ell) \times I}).}
     \item{y_stack, z_stack}{Pooled outcome/regressor matrices (complete-case
