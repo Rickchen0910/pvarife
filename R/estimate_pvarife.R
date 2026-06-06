@@ -53,6 +53,8 @@
 #'     \item{sigma}{Reduced-form error covariance matrix (\eqn{K \times K}).}
 #'     \item{u_c}{Array of residuals \eqn{TK \times 1 \times I} (NA at
 #'       unobserved positions).}
+#'     \item{y_arr}{The original input array \eqn{I \times T \times K} (used,
+#'       e.g., for initial conditions in \code{\link{bootstrap_irf_bands}}).}
 #'     \item{y_c, z_c}{Stacked outcome/regressor arrays (\eqn{TK \times 1 \times I}
 #'       and \eqn{TK \times (K + K^2\ell) \times I}).}
 #'     \item{y_stack, z_stack}{Pooled outcome/regressor matrices (complete-case
@@ -112,6 +114,7 @@ pvarife <- function(y, n_lags, n_factors, n_out = 50L, n_in = 10L,
   structure(
     c(res,
       list(
+        y_arr   = y,
         y_c     = yz$y_c,
         z_c     = yz$z_c,
         y_stack = yz$y_stack,
