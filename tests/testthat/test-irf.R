@@ -119,3 +119,31 @@ test_that("compute_irf: bias_correct=TRUE gives different result from FALSE", {
   # The two should differ (bias != 0 in general)
   expect_false(isTRUE(all.equal(as.numeric(ir), as.numeric(ir_bc))))
 })
+
+test_that("bootstrap_irf_bands: returns valid pvarife_bands with ordered bands", {
+  sim   <- sim_pvarife(n_units = 20L, n_time = 15L, n_vars = 2L,
+                       n_lags = 1L, n_factors = 1L, seed = 21L)
+  fit   <- pvarife(sim$y, n_lags = 1L, n_factors = 1L, n_out = 4L, n_in = 3L,
+                   balanced_init = FALSE)
+  bands <- bootstrap_irf_bands(fit, n_periods = 5L, n_boot = 15L, seed = 7L)
+
+  expect_s3_class(bands, "pvarife_bands")
+  expect_equal(bands$method, "bootstrap")
+  expect_equal(dim(bands$irf), c(2L, 5L))
+  expect_true(all(bands$lower <= bands$irf + 1e-9))
+  expect_true(all(bands$irf   <= bands$upper + 1e-9))
+})
+
+test_that("bootstrap_irf_bands: recursive design is not inflated at h=0", {
+  # Regression test: a fixed-design bootstrap badly inflates the h=0 response.
+  # The recursive bootstrap median at h=0 should be close to chol(Sigma)'[,1].
+  sim   <- sim_pvarife(n_units = 40L, n_time = 30L, n_vars = 2L,
+                       n_lags = 1L, n_factors = 1L, seed = 123L)
+  fit   <- pvarife(sim$y, n_lags = 1L, n_factors = 1L, n_out = 15L, n_in = 6L,
+                   balanced_init = FALSE)
+  a0_col1 <- t(chol(fit$sigma))[, 1L]                 # point impact, shock 1
+  bands   <- bootstrap_irf_bands(fit, n_periods = 4L, n_boot = 60L, seed = 11L)
+  # Median h=0 response within 25% of the point estimate (no gross inflation)
+  expect_lt(abs(bands$irf[1L, 1L] - a0_col1[1L]) / a0_col1[1L], 0.25)
+  expect_lt(abs(bands$irf[2L, 1L] - a0_col1[2L]) / abs(a0_col1[2L]), 0.40)
+})
