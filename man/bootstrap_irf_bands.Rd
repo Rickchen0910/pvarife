@@ -59,9 +59,17 @@ first \eqn{\ell} periods are initialised at the observed data
 replacement (whole time rows, so the cross-variable correlation is kept).
 Because the path is generated recursively, the bootstrap correctly
 propagates the VAR dynamics — unlike a fixed-design scheme that reuses the
-original lags. The factor-estimation uncertainty is not resampled (the
-common component is held fixed); use \code{\link{irf_bands}} for bands that
-also reflect factor uncertainty.
+original lags.
+
+\strong{Scope of the bands.} Only the idiosyncratic errors are resampled;
+the common component \eqn{\hat F_t \hat\lambda_i} and the reduced-form
+covariance structure are held at their estimates. The resulting bands
+therefore capture idiosyncratic-error uncertainty only and \emph{under-cover}
+when the common factors account for a large share of the variation (as they
+do in the simulation design of Tugan 2021). This routine is intended as a
+robustness check; for coefficient inference use \code{\link{asymptotic_var}}
+or \code{\link{summary.pvarife_result}}, and for the paper's IRF bands use
+\code{\link{irf_bands}}.
 }
 \examples{
 \donttest{
