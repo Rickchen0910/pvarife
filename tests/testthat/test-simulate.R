@@ -48,3 +48,21 @@ test_that("sim_pvarife: short-run returns integer(0) for diff_vars_suggested", {
   sim_sr <- sim_pvarife(identification = "short_run", seed = 32L)
   expect_equal(sim_sr$diff_vars_suggested, integer(0))
 })
+
+test_that("sim_pvarife: beta_true layout matches estimator for n_lags = 2", {
+  # Regression test: beta_true must use the same (equation-major, lag-nested)
+  # layout as fit$beta / .build_yz. A large sample should recover beta_true.
+  sim <- sim_pvarife(n_units = 80L, n_time = 60L, n_vars = 2L, n_lags = 2L,
+                     n_factors = 1L, seed = 5L)
+  expect_length(sim$beta_true, 2L + 2L^2 * 2L)   # K + K^2 * L
+  fit <- pvarife(sim$y, n_lags = 2L, n_factors = 1L, n_out = 25L, n_in = 8L,
+                 balanced_init = FALSE)
+  # Lag coefficients recovered to within 0.06 (finite-sample tolerance)
+  dev <- max(abs(as.numeric(fit$beta)[-(1:2)] - sim$beta_true[-(1:2)]))
+  expect_lt(dev, 0.06)
+})
+
+test_that("sim_pvarife: beta_true for n_lags = 1 is unchanged", {
+  sim <- sim_pvarife(n_units = 10L, n_time = 10L, seed = 1L)
+  expect_equal(sim$beta_true, c(1.0, 1.0, 0.65, 0.30, 0.20, 0.60))
+})
