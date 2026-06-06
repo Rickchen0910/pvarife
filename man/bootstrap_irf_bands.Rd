@@ -2,7 +2,7 @@
 % Please edit documentation in R/confidence_bands.R
 \name{bootstrap_irf_bands}
 \alias{bootstrap_irf_bands}
-\title{Classical residual bootstrap confidence bands for IRFs}
+\title{Recursive residual bootstrap confidence bands for IRFs}
 \usage{
 bootstrap_irf_bands(
   fit,
@@ -40,12 +40,28 @@ An object of class \code{"pvarife_bands"} with components
   \code{method = "bootstrap"}.
 }
 \description{
-Constructs confidence bands for structural impulse responses via a classical
-residual bootstrap. For each bootstrap replicate, residuals are resampled
-(by time index, preserving cross-sectional dependence), a new panel is
-constructed, the full \code{pvarife} model is re-estimated, and IRFs are
-computed. This is computationally expensive but does not rely on asymptotic
-approximations.
+Constructs confidence bands for structural impulse responses via a recursive
+residual bootstrap. For each bootstrap replicate, the idiosyncratic residuals
+are resampled (by time index, preserving the contemporaneous correlation
+across variables), a new panel is generated \emph{recursively} from the
+estimated VAR dynamics and the (fixed) estimated common component, the full
+\code{pvarife} model is re-estimated, and IRFs are computed. This is
+computationally expensive but does not rely on asymptotic approximations.
+}
+\details{
+Each bootstrap panel is generated as
+\deqn{y^*_{i,t} = c + \sum_{l=1}^{\ell} \Theta_l y^*_{i,t-l}
+      + \hat F_t \hat\lambda_i + e^*_{i,t},}
+where \eqn{(c, \Theta_l)} are the estimated coefficients, the common
+component \eqn{\hat F_t \hat\lambda_i} is held fixed at its estimate, the
+first \eqn{\ell} periods are initialised at the observed data
+\eqn{y^*_{i,t} = y_{i,t}}, and \eqn{e^*_{i,t}} are residuals resampled with
+replacement (whole time rows, so the cross-variable correlation is kept).
+Because the path is generated recursively, the bootstrap correctly
+propagates the VAR dynamics — unlike a fixed-design scheme that reuses the
+original lags. The factor-estimation uncertainty is not resampled (the
+common component is held fixed); use \code{\link{irf_bands}} for bands that
+also reflect factor uncertainty.
 }
 \examples{
 \donttest{
