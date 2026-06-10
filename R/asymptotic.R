@@ -16,10 +16,20 @@
 #'     \eqn{\bar G = \lfloor T^{1/3} \rceil}).}
 #' }
 #'
-#' \strong{Note on MATLAB replication:} The original \code{Asymptotic_Distribution_of_beta.m}
-#' contains a bug at line 189 where the \eqn{B_\gamma} accumulation uses only the
-#' final value of the loop variable \code{g} rather than summing over
-#' \eqn{g = 1, \ldots, \bar G}. This function implements the \emph{corrected} version.
+#' \strong{Notes on MATLAB replication:} This implementation deviates from the
+#' original \code{Asymptotic_Distribution_of_beta.m} in two places, following
+#' the paper rather than the code:
+#' \enumerate{
+#'   \item \eqn{B_\gamma}: the MATLAB accumulation (line 189) uses only the
+#'     final value of the loop variable \code{g} rather than summing over
+#'     \eqn{g = 1, \ldots, \bar G} as in Eq. (2.56). Corrected here.
+#'   \item \eqn{\Omega}: MATLAB uses
+#'     \eqn{\Gamma\,\mathrm{diag}(u)^2\,\Gamma^\top}, which drops the
+#'     within-period cross-variable terms \eqn{u_{t,n} u_{t,m}} present in
+#'     Eq. (2.65). This function computes the per-period outer products of
+#'     Eq. (2.65); in simulations this gives (weakly) better
+#'     confidence-interval coverage.
+#' }
 #'
 #' @param fit An object of class \code{"pvarife_result"} returned by
 #'   \code{\link{pvarife}}.
@@ -160,9 +170,19 @@ asymptotic_var <- function(fit) {
   d_inv <- solve(d_fl)
 
   # -------------------------------------------------------------------------
-  # Omega: sandwich variance
-  # Gamma_i_Z = (1/K) * (Z_i'M_F - (1/(K*I)) * sum_z_mf_lam * kron_inv * kron_i[:, obs])
-  # Omega = (1/sum_tc) * sum_i Gamma_i_Z diag(u_i) diag(u_i)' Gamma_i_Z'
+  # Omega: sandwich variance, Eq. (2.65):
+  #   Omega = (1/sum_tc) sum_i sum_t Gamma_{i,t} e_{i,t} e_{i,t}' Gamma_{i,t}'
+  # where e_{i,t} is the K-vector of residuals at period t and Gamma_{i,t} the
+  # corresponding K columns of Gamma_i_Z. The per-period outer product keeps
+  # the within-period cross-variable terms u_{t,n} u_{t,m}.
+  #
+  # Note on MATLAB replication: Asymptotic_Distribution_of_beta.m instead uses
+  # Gamma * diag(u) * diag(u) * Gamma', which drops those cross-variable terms
+  # and does not match Eq. (2.65) of the paper. This implementation follows
+  # the paper; in simulations the paper's form gives (weakly) better coverage.
+  # Period grouping is well-defined because .build_yz() treats a period with
+  # any missing variable as entirely missing, so observed rows always come in
+  # complete K-blocks.
   # -------------------------------------------------------------------------
   omega <- matrix(0.0, nrow = n_cols_z, ncol = n_cols_z)
 
@@ -179,8 +199,12 @@ asymptotic_var <- function(fit) {
     gamma_second <- sum_z_mf_lam %*% kron_inv %*% kron_i_obs             # n_cols_z x n_obs
     gamma_iz <- (1.0 / n_vars) * (gamma_first - (1.0 / (n_vars * n_units)) * gamma_second)
 
-    gamma_u <- gamma_iz %*% diag(uu, nrow = length(uu))                  # n_cols_z x n_obs
-    omega <- omega + tcrossprod(gamma_u)
+    n_per <- length(obs) %/% n_vars
+    for (ss in seq_len(n_per)) {
+      cols  <- ((ss - 1L) * n_vars + 1L):(ss * n_vars)
+      gamma_e <- gamma_iz[, cols, drop = FALSE] %*% uu[cols]             # n_cols_z x 1
+      omega <- omega + tcrossprod(gamma_e)
+    }
   }
   omega <- omega / sum_tc
 
