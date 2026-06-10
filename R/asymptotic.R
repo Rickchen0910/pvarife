@@ -69,12 +69,17 @@ asymptotic_var <- function(fit) {
   # -------------------------------------------------------------------------
   # lambda_underbar: stacked (K x r) loading matrix, one per unit, bound by row
   # MATLAB: lambda_underbar_c(:,:,i) = reshape(lambda(:,i)', r, K)  [r x K]
-  # In R: lam_list[[i]] = matrix(loadings[,i], nrow=K, ncol=r)     [K x r]
-  # The full lambda_underbar is stacked vertically: (K*I x r)
+  #
+  # LAYOUT (critical for r >= 2): the loading vector follows the column layout
+  # of factors_mat, whose row (t,n) is e_n' (x) f_t'. Hence the vector is
+  # variable-major in blocks of r:  v[(n-1)*r + j] = loading of factor j on
+  # variable n. The K x r loading matrix is therefore t(matrix(v, r, K)),
+  # matching MATLAB's reshape(v', r, K)'. (matrix(v, K, r) would scramble the
+  # layout whenever r >= 2; both coincide for r = 1.)
   # -------------------------------------------------------------------------
   lam_list <- vector("list", n_units)
   for (ii in seq_len(n_units)) {
-    lam_list[[ii]] <- matrix(loadings[, ii], nrow = n_vars, ncol = n_factors)  # K x r
+    lam_list[[ii]] <- t(matrix(loadings[, ii], nrow = n_factors, ncol = n_vars))  # K x r
   }
   lambda_underbar <- do.call(rbind, lam_list)  # (K*I) x r
 
