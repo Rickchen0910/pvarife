@@ -275,15 +275,16 @@ pvarife <- function(y, n_lags, n_factors, n_out = 50L, n_in = 10L,
 
     u_c[obs_rows, 1L, ii] <- as.numeric(yy - zz %*% beta_iter - ci)
 
-    # Reshape u to T_i x K for Sigma computation
-    u_vec <- u_c[obs_rows, 1L, ii]
-    tt_i  <- length(obs_rows) / n_vars
-    n_time_i[ii] <- as.integer(round(tt_i))
-    tnc_i[ii]    <- as.integer(round(tt_i)) * n_vars
-
-    u_mat <- matrix(u_vec, nrow = n_vars, ncol = round(tt_i))
-    u_mat <- t(u_mat)   # T_i x K
-    sigma_acc <- sigma_acc + crossprod(u_mat)
+    # Sigma from COMPLETE time periods only, MATLAB-style:
+    # reshape the full TK residual vector (NA at unobserved rows) to T x K and
+    # drop any period with a missing variable. Reshaping only the observed
+    # rows would silently misalign whenever a period is partially observed
+    # (observed row count not divisible by K).
+    u_mat_full <- t(matrix(u_c[, 1L, ii], nrow = n_vars))   # T x K, NAs kept
+    keep_t <- stats::complete.cases(u_mat_full)
+    n_time_i[ii] <- sum(keep_t)
+    tnc_i[ii]    <- sum(keep_t) * n_vars
+    sigma_acc <- sigma_acc + crossprod(u_mat_full[keep_t, , drop = FALSE])
   }
 
   sigma <- sigma_acc / sum(n_time_i)
