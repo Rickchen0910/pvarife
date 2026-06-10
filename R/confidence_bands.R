@@ -309,7 +309,8 @@ bootstrap_irf_bands <- function(fit, n_periods, shock = 1L,
   # C_i stacked = factors_mat %*% loadings[, i]  (TK x 1), reshaped to T x K.
   # Residuals are taken on observed rows only (T_i x K).
   cc_list <- vector("list", n_units)   # T x K (all periods)
-  u_list  <- vector("list", n_units)   # T_i x K (observed periods)
+  u_list  <- vector("list", n_units)   # complete periods only (T_i x K)
+  n_rows_full <- dim(y_c)[1L]
   for (ii in seq_len(n_units)) {
     cc_vec <- as.numeric(factors_mat %*% loadings[, ii])      # TK x 1
     cc_list[[ii]] <- t(matrix(cc_vec, nrow = n_vars, ncol = n_time))  # T x K
@@ -318,8 +319,14 @@ bootstrap_irf_bands <- function(fit, n_periods, shock = 1L,
     if (length(obs) == 0L) { u_list[[ii]] <- NULL; next }
     yy <- y_c[obs, 1L, ii]
     zz <- matrix(z_c[obs, , ii], nrow = length(obs))
-    uu <- yy - as.numeric(zz %*% beta) - cc_vec[obs]
-    u_list[[ii]] <- t(matrix(uu, nrow = n_vars, ncol = n_time_i[ii]))  # T_i x K
+    # Full-vector reshape, then keep complete periods (robust to partial
+    # missingness, where length(obs) is not a multiple of K)
+    u_full <- rep(NA_real_, n_rows_full)
+    u_full[obs] <- yy - as.numeric(zz %*% beta) - cc_vec[obs]
+    u_mat  <- t(matrix(u_full, nrow = n_vars))                # T x K
+    keep_t <- stats::complete.cases(u_mat)
+    if (!any(keep_t)) { u_list[[ii]] <- NULL; next }
+    u_list[[ii]] <- u_mat[keep_t, , drop = FALSE]
   }
 
   irf_draws <- array(NA_real_, dim = c(n_vars, n_periods, n_boot))
@@ -330,9 +337,9 @@ bootstrap_irf_bands <- function(fit, n_periods, shock = 1L,
 
     for (ii in seq_len(n_units)) {
       if (is.null(u_list[[ii]])) next
-      tt_i   <- n_time_i[ii]
       cc_i   <- cc_list[[ii]]                                   # T x K
       e_pool <- u_list[[ii]]                                    # T_i x K
+      tt_i   <- nrow(e_pool)                                    # pool size
 
       # Initialise the first n_lags periods at the observed data
       for (tt in seq_len(n_lags)) y_arr_boot[ii, tt, ] <- y_arr[ii, tt, ]
