@@ -168,9 +168,11 @@ compute_irf <- function(fit, n_periods, shock = 1L, diff_vars = integer(0),
                          n_time_i, i_obs, n_units, n_periods,
                          shock, diff_vars,
                          identification = "short_run") {
-  # Compute residuals and Sigma for this draw
+  # Compute residuals and Sigma for this draw (complete periods only;
+  # full-vector reshape avoids misalignment under partial missingness)
   u_acc     <- matrix(0.0, nrow = n_vars, ncol = n_vars)
   sum_tc_b  <- 0L
+  n_rows    <- dim(y_c)[1L]
 
   for (ii in seq_len(n_units)) {
     obs <- which(i_obs[, ii] == 1L)
@@ -178,12 +180,13 @@ compute_irf <- function(fit, n_periods, shock = 1L, diff_vars = integer(0),
     yy   <- matrix(y_c[obs, 1L, ii], ncol = 1L)
     zz   <- matrix(z_c[obs, , ii], nrow = length(obs))
     cc_i <- matrix(cc[obs, ii], ncol = 1L)
-    uu   <- yy - zz %*% beta_b - cc_i
 
-    tt_i <- n_time_i[ii]
-    sum_tc_b <- sum_tc_b + tt_i
-    u_mat <- t(matrix(as.numeric(uu), nrow = n_vars, ncol = tt_i))
-    u_acc <- u_acc + crossprod(u_mat)
+    u_full <- rep(NA_real_, n_rows)
+    u_full[obs] <- as.numeric(yy - zz %*% beta_b - cc_i)
+    u_mat  <- t(matrix(u_full, nrow = n_vars))      # T x K, NAs kept
+    keep_t <- stats::complete.cases(u_mat)
+    sum_tc_b <- sum_tc_b + sum(keep_t)
+    u_acc <- u_acc + crossprod(u_mat[keep_t, , drop = FALSE])
   }
   sigma_b <- u_acc / sum_tc_b
 
