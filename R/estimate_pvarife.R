@@ -24,7 +24,15 @@
 #'
 #' @param y A numeric array of dimension \eqn{I \times T \times K}
 #'   (units \eqn{\times} time \eqn{\times} variables). \code{NA} values are
-#'   allowed for unbalanced panels.
+#'   allowed for unbalanced panels. Following the original implementation, if
+#'   \emph{any} variable is missing for unit \eqn{i} at period \eqn{t}, the
+#'   whole period is treated as missing for that unit. Missing periods are
+#'   excluded from the coefficient update and their common component is imputed
+#'   by the EM step. \strong{Caution:} simulation evidence shows that the point
+#'   estimator can exhibit noticeable finite-sample bias when the share of
+#'   missing periods is substantial (roughly above 10--15\% at moderate
+#'   \eqn{I, T}); results under heavy missingness should be interpreted with
+#'   care and checked for robustness (e.g., on a balanced subsample).
 #' @param n_lags Positive integer. Lag order \eqn{\ell}.
 #' @param n_factors Positive integer. Number of interactive fixed effects \eqn{r}.
 #' @param n_out Positive integer. Number of outer iterations (default 50).
