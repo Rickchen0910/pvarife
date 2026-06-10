@@ -131,6 +131,13 @@ ols_nan <- function(y, x) {
     ymat <- y_arr[ii, , , drop = FALSE]
     ymat <- matrix(ymat, nrow = n_time, ncol = n_vars)
 
+    # Period-level NA propagation, faithful to EmpiricalApplication.m
+    # (NonStackedDVC(any(isnan(...),2),:,i) = NaN): if ANY variable is missing
+    # at period t, the whole period is treated as missing. This also rules out
+    # partially-observed periods downstream.
+    incomplete_t <- !stats::complete.cases(ymat)
+    if (any(incomplete_t)) ymat[incomplete_t, ] <- NA_real_
+
     lag_mat <- lag_lead_matrix(ymat, 1L, n_lags)  # T x K*n_lags
 
     yy_c <- matrix(NA_real_, nrow = n_vars * n_time, ncol = 1L)
