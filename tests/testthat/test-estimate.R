@@ -52,3 +52,21 @@ test_that("pvarife: balanced_init=FALSE gives same result on balanced data", {
   # Point estimates should be very close (same algorithm, same data)
   expect_equal(as.numeric(fit_t$beta), as.numeric(fit_f$beta), tolerance = 1e-4)
 })
+
+test_that("partial-variable missingness: Sigma uses complete periods, no warnings", {
+  # Unit 3 missing var 1 only at t = 7 (with n_lags = 1 this invalidates the
+  # (7, var1) row and all rows at t = 8). Observed row count becomes odd;
+  # a naive reshape would silently recycle. Regression test for that bug.
+  sim <- sim_pvarife(n_units = 15L, n_time = 20L, seed = 3L)
+  y <- sim$y
+  y[3L, 7L, 1L] <- NA
+  expect_no_warning(
+    fit <- pvarife(y, n_lags = 1L, n_factors = 1L, n_out = 5L, n_in = 3L)
+  )
+  # Complete periods for unit 3: t = 2..20 minus t = 7 (partial) and t = 8
+  expect_identical(fit$n_time_i[3L], 17L)
+  expect_true(all(is.finite(fit$sigma)))
+  # Full inference chain runs on partially-missing data
+  av <- asymptotic_var(fit)
+  expect_true(all(is.finite(av$bias)))
+})
