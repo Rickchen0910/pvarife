@@ -35,10 +35,20 @@ The function computes three components:
     \eqn{\bar G = \lfloor T^{1/3} \rceil}).}
 }
 
-\strong{Note on MATLAB replication:} The original \code{Asymptotic_Distribution_of_beta.m}
-contains a bug at line 189 where the \eqn{B_\gamma} accumulation uses only the
-final value of the loop variable \code{g} rather than summing over
-\eqn{g = 1, \ldots, \bar G}. This function implements the \emph{corrected} version.
+\strong{Notes on MATLAB replication:} This implementation deviates from the
+original \code{Asymptotic_Distribution_of_beta.m} in two places, following
+the paper rather than the code:
+\enumerate{
+  \item \eqn{B_\gamma}: the MATLAB accumulation (line 189) uses only the
+    final value of the loop variable \code{g} rather than summing over
+    \eqn{g = 1, \ldots, \bar G} as in Eq. (2.56). Corrected here.
+  \item \eqn{\Omega}: MATLAB uses
+    \eqn{\Gamma\,\mathrm{diag}(u)^2\,\Gamma^\top}, which drops the
+    within-period cross-variable terms \eqn{u_{t,n} u_{t,m}} present in
+    Eq. (2.65). This function computes the per-period outer products of
+    Eq. (2.65); in simulations this gives (weakly) better
+    confidence-interval coverage.
+}
 }
 \examples{
 sim <- sim_pvarife(n_units = 30, n_time = 20, n_vars = 2,
