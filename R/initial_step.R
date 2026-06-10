@@ -55,6 +55,15 @@
   has_na_z <- apply(z_c_bal[, 2L, , drop = FALSE], 1L, function(x) any(is.na(x)))
   keep_rows <- !has_na_y & !has_na_z
 
+  # Drop whole time periods, not individual rows: if any of the K rows of a
+  # period is dropped, drop all K rows of that period. This keeps the row
+  # count a multiple of K so the T x K reshape inside .objective_fn is
+  # well-formed. (MATLAB trims row-wise and its reshape would error on a
+  # partially-observed period; whole-period trimming handles that case.)
+  period_of_row <- ceiling(seq_along(keep_rows) / n_vars)
+  bad_periods   <- unique(period_of_row[!keep_rows])
+  keep_rows     <- keep_rows & !(period_of_row %in% bad_periods)
+
   y_c_bal_trim <- y_c_bal[keep_rows, , , drop = FALSE]
   z_c_bal_trim <- z_c_bal[keep_rows, , , drop = FALSE]
 
