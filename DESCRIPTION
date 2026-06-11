@@ -1,6 +1,6 @@
 Package: pvarife
 Type: Package
-Version: 0.1.1
+Version: 0.1.2
 Title: Panel VAR Models with Interactive Fixed Effects
 Description: Implements the estimator of Tugan (2021) <doi:10.1093/ectj/utaa021>
     for panel vector autoregression (VAR) models with interactive fixed effects.
