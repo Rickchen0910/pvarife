@@ -1,6 +1,13 @@
 ## Resubmission
 
-This is a resubmission addressing the CRAN reviewer's comments:
+This is a resubmission addressing the CRAN reviewer's latest comment:
+
+0. **Add a link to the second reference in the Description.**
+   The second reference, Bai (2009), now carries its DOI:
+   "following the approach of Bai (2009) <doi:10.3982/ECTA6135>".
+   The first reference, Tugan (2021), already had <doi:10.1093/ectj/utaa021>.
+
+Previously addressed comments (retained for context):
 
 1. **Explain all acronyms in the Description text.**
    The Description has been rewritten so that the only acronym, "VAR", is
